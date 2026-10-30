@@ -18,7 +18,7 @@ const kHasCustomIcon = 0x0400
 
 // buildNative creates the DMG entirely in Go (hfsplus + udif), with no macOS
 // tools, so it works when cross-compiled to any platform. It produces a
-// case-insensitive HFS+ volume in a UDZO container.
+// HFS+ or case-sensitive HFSX volume in a UDZO container.
 func buildNative(opts Options) error {
 	if opts.Format != "" && opts.Format != FormatUDZO {
 		return fmt.Errorf("dmg: native backend only supports UDZO format (got %s); use BackendHdiutil", opts.Format)
@@ -27,7 +27,10 @@ func buildNative(opts Options) error {
 		return fmt.Errorf("dmg: native backend does not support APFS; use BackendHdiutil")
 	}
 
-	vol := &hfsplus.Volume{Name: opts.VolumeName, CreatedAt: time.Now()}
+	vol := &hfsplus.Volume{
+		Name: opts.VolumeName, CreatedAt: time.Now(),
+		CaseSensitive: opts.Filesystem == FSHFSX,
+	}
 
 	// Files (in sorted order, matching the .DS_Store icon layout).
 	for _, name := range sortedFileNames(opts) {

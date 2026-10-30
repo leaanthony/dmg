@@ -14,10 +14,14 @@ func hdiutilCreate(volName string, fs Filesystem, sizeMB int, outputPath string)
 	if fs == "" {
 		fs = FSHFSPlus
 	}
+	fsName := string(fs)
+	if fs == FSHFSX {
+		fsName = "Case-sensitive HFS+"
+	}
 	args := []string{
 		"create",
 		"-volname", volName,
-		"-fs", string(fs),
+		"-fs", fsName,
 		"-size", fmt.Sprintf("%dm", sizeMB),
 		outputPath,
 	}
@@ -29,7 +33,7 @@ func hdiutilAttach(dmgPath string) (string, error) {
 	args := []string{
 		"attach",
 		dmgPath,
-		"-nobrowse",  // Don't show in Finder
+		"-nobrowse", // Don't show in Finder
 		"-owners", "off",
 	}
 

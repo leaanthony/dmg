@@ -134,6 +134,11 @@ func validateOptions(opts *Options) error {
 	if opts.Filesystem == "" {
 		opts.Filesystem = FSHFSPlus
 	}
+	switch opts.Filesystem {
+	case FSHFSPlus, FSHFSX, FSAPFS:
+	default:
+		return fmt.Errorf("unsupported filesystem %q", opts.Filesystem)
+	}
 	if opts.Window.Width == 0 {
 		opts.Window = WindowConfig{X: 100, Y: 100, Width: 540, Height: 380}
 	}

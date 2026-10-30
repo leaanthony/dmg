@@ -85,7 +85,8 @@ func main() {
 | `BackendNative` | Pure-Go `hfsplus` + `udif` | any (cross-compiles) |
 | `BackendHdiutil` | macOS `hdiutil` / `ditto` | macOS only |
 
-The **native** backend produces a case-insensitive **HFS+** volume in a **UDZO
+The **native** backend produces a case-insensitive **HFS+** volume by default,
+or a case-sensitive **HFSX** volume when `Filesystem` is `FSHFSX`, in a **UDZO
 (zlib)** container. It supports files, nested folders, symlinks, the background
 image, volume icon, `.DS_Store` styling, and `IconPositions`. Code signatures
 on `.app` bundles are preserved (verified with `codesign --verify`).
@@ -100,7 +101,7 @@ if err := dmg.Build(opts); err != nil { /* ... */ }
 Native-backend limitations (use `BackendHdiutil` on macOS if you need these):
 
 - UDZO format only (no LZFSE/LZMA/bzip2)
-- HFS+ only (no APFS)
+- HFS+ and HFSX only (no APFS)
 - Case-insensitive volumes currently require ASCII file names; non-ASCII names
   need a case-sensitive volume (a full Unicode fold table is planned)
 - The icon on the `.dmg` file itself (`FileIcon`) is applied only on macOS
@@ -199,7 +200,7 @@ for each package.
 | `Icon` | `IconConfig` | Icon appearance settings |
 | `Background` | `*BackgroundConfig` | Window background (nil for default white) |
 | `Format` | `Format` | Compression format (default: `FormatUDZO`) |
-| `Filesystem` | `Filesystem` | `FSHFSPlus` (default) or `FSAPFS` (hdiutil backend) |
+| `Filesystem` | `Filesystem` | `FSHFSPlus` (default), `FSHFSX` (case-sensitive), or `FSAPFS` (hdiutil backend) |
 | `SizeHint` | `int` | Writable DMG size in MB (0 = auto; hdiutil backend) |
 | `VolumeIcon` | `string` | Path to icon file for the mounted volume |
 | `FileIcon` | `string` | Path to icon file for the .dmg file in Finder |
@@ -299,12 +300,39 @@ Or use a JSON config file:
 mkdmg -config dmg.json
 ```
 
+### HFSX and CLI backend selection
+
+Use HFSX for non-ASCII filenames with the native backend:
+
+```sh
+mkdmg -backend native -fs HFSX -volname "Example" -app "Example.app" -output "Example.dmg"
+```
+
+Both backends support HFSX. Unsupported filesystem names return an error.
+JSON configuration also accepts `"backend": "native"` (`auto` and `hdiutil`
+are supported) and explicit positions, for example:
+
+```json
+{
+  "volume_name": "Example",
+  "output": "Example.dmg",
+  "filesystem": "HFSX",
+  "backend": "native",
+  "files": {"Example.app": "Example.app"},
+  "applications_symlink": true,
+  "icon_positions": {
+    "Example.app": {"x": 170, "y": 160},
+    "Applications": {"x": 470, "y": 160}
+  }
+}
+```
+
 ## Platform support
 
 | Task | Pure-Go (native) backend | hdiutil backend |
 |------|--------------------------|-----------------|
 | Create a styled `.dmg` | any OS (cross-compiles) | macOS only |
-| Output format | UDZO / HFS+ | all formats, HFS+ & APFS |
+| Output format | UDZO / HFS+ & HFSX | all formats, HFS+, HFSX & APFS |
 | `.DS_Store` + ICNS generation | pure Go | pure Go |
 
 The pure-Go backend has no cgo and no external tool dependencies.

@@ -21,6 +21,7 @@ type Filesystem string
 
 const (
 	FSHFSPlus Filesystem = "HFS+"
+	FSHFSX    Filesystem = "HFSX" // Case-sensitive; supports non-ASCII names in the native backend.
 	FSAPFS    Filesystem = "APFS"
 )
 
@@ -33,7 +34,7 @@ const (
 	BackendAuto Backend = iota
 	// BackendNative uses the pure-Go hfsplus+udif backend. It needs no macOS
 	// tools, so it works when cross-compiled to any platform. It produces a
-	// UDZO, HFS+ image (other formats/filesystems require BackendHdiutil).
+	// UDZO, HFS+/HFSX image (other formats/filesystems require BackendHdiutil).
 	BackendNative
 	// BackendHdiutil uses macOS hdiutil/ditto (darwin only).
 	BackendHdiutil

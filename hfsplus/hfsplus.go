@@ -194,11 +194,15 @@ func Build(vol *Volume) ([]byte, error) {
 
 	// Root folder record + thread.
 	rootKey := catalogKey(cnidRootParent, vol.Name)
+	if len(rootKey) > 8+2*255 {
+		return nil, fmt.Errorf("hfsplus: volume name exceeds 255 UTF-16 units after decomposition")
+	}
 	add(catalogFolderRecord(cnidRootParent, vol.Name, cnidRootFolder, uint32(len(vol.Children)), vol.CreatedAt, vol.RootFinderFlags), rootKey)
 	add(catalogThreadRecord(cnidRootFolder, recFolderThread, cnidRootParent, vol.Name), catalogKey(cnidRootFolder, ""))
 
 	var walk func(parent uint32, children []*Entry) error
 	walk = func(parent uint32, children []*Entry) error {
+		names := make(map[string]bool, len(children))
 		for _, e := range children {
 			if e.Name == "" {
 				return fmt.Errorf("hfsplus: entry under CNID %d has empty name", parent)
@@ -206,13 +210,20 @@ func Build(vol *Volume) ([]byte, error) {
 			if !vol.CaseSensitive && !isASCII(e.Name) {
 				return fmt.Errorf("hfsplus: name %q has non-ASCII characters; set CaseSensitive", e.Name)
 			}
+			key := catalogKey(parent, e.Name)
+			if len(key) > 8+2*255 {
+				return fmt.Errorf("hfsplus: name %q exceeds 255 UTF-16 units after decomposition", e.Name)
+			}
+			if names[string(key)] {
+				return fmt.Errorf("hfsplus: duplicate name %q after decomposition under CNID %d", e.Name, parent)
+			}
+			names[string(key)] = true
 			cnid := nextCNID
 			nextCNID++
 			e.CNID = cnid
 			switch e.Kind {
 			case KindDir:
 				folderCount++
-				key := catalogKey(parent, e.Name)
 				add(catalogFolderRecord(parent, e.Name, cnid, uint32(len(e.Children)), vol.CreatedAt, e.FinderFlags), key)
 				add(catalogThreadRecord(cnid, recFolderThread, parent, e.Name), catalogKey(cnid, ""))
 				if err := walk(cnid, e.Children); err != nil {
@@ -237,7 +248,6 @@ func Build(vol *Volume) ([]byte, error) {
 					mode |= 0100000
 				}
 				blockCount := uint32((len(data) + blockSize - 1) / blockSize)
-				key := catalogKey(parent, e.Name)
 				rec := catalogFileRecord(parent, e.Name, cnid, vol.CreatedAt, mode, ftype, fcreator, e.FinderFlags,
 					fileForkInfo{logicalSize: uint64(len(data)), startBlock: 0, blockCount: blockCount})
 				idx := add(rec, key)

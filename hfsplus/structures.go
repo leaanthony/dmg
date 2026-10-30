@@ -173,7 +173,7 @@ func buildEmptyBTree(blocks int, maxKeyLen uint16, compareType uint8) []byte {
 
 // catalogKey builds a catalog B-tree key (parentID + name).
 func catalogKey(parentID uint32, name string) []byte {
-	u := utf16.Encode([]rune(name))
+	u := utf16.Encode(decomposeName(name))
 	keyLen := 4 + 2 + 2*len(u) // parentID + nameLength + name
 	b := make([]byte, 2+keyLen)
 	be.PutUint16(b[0:2], uint16(keyLen))
@@ -256,7 +256,7 @@ func putForkData(b []byte, f fileForkInfo) {
 
 func catalogThreadRecord(ownID uint32, recordType uint16, parentID uint32, name string) []byte {
 	key := catalogKey(ownID, "")
-	u := utf16.Encode([]rune(name))
+	u := utf16.Encode(decomposeName(name))
 	data := make([]byte, 8+2+2*len(u))
 	be.PutUint16(data[0:2], recordType)
 	be.PutUint16(data[2:4], 0) // reserved

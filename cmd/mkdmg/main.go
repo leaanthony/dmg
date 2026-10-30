@@ -16,7 +16,9 @@ func main() {
 	volName := flag.String("volname", "", "Volume name displayed in Finder title bar (required)")
 	output := flag.String("output", "", "Output DMG file path (required)")
 	format := flag.String("format", "UDZO", "DMG format: UDZO (zlib), ULFO (lzfse), ULMO (lzma), UDBZ (bzip2), UDRW (raw)")
-	fs := flag.String("fs", "HFS+", "Filesystem: HFS+ or APFS")
+	fs := flag.String("fs", "HFS+", "Filesystem: HFS+, HFSX (case-sensitive), or APFS")
+
+	backend := flag.String("backend", "auto", "Backend: auto, native, or hdiutil")
 
 	// Files
 	app := flag.String("app", "", "Path to .app bundle to include")
@@ -78,6 +80,15 @@ func main() {
 			*bgImage, *bgColor,
 			*volumeIcon, *fileIcon, *sizeHint,
 		)
+	}
+
+	if *configFile == "" {
+		var err error
+		opts.Backend, err = parseBackend(*backend)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			os.Exit(1)
+		}
 	}
 
 	// Validate minimum required fields
@@ -177,24 +188,39 @@ func parseColor(s string) (*dmg.ColorRGB, error) {
 	return &dmg.ColorRGB{R: r, G: g, B: b}, nil
 }
 
+func parseBackend(s string) (dmg.Backend, error) {
+	switch s {
+	case "", "auto":
+		return dmg.BackendAuto, nil
+	case "native":
+		return dmg.BackendNative, nil
+	case "hdiutil":
+		return dmg.BackendHdiutil, nil
+	default:
+		return dmg.BackendAuto, fmt.Errorf("unsupported backend %q", s)
+	}
+}
+
 // JSON config structure
 type jsonConfig struct {
-	VolumeName             string            `json:"volume_name"`
-	OutputPath             string            `json:"output"`
-	Format                 string            `json:"format"`
-	Filesystem             string            `json:"filesystem"`
-	Files                  map[string]string `json:"files"`
-	AddApplicationsSymlink *bool             `json:"applications_symlink"`
-	Background             *jsonBackground   `json:"background"`
-	VolumeIcon             string            `json:"volume_icon"`
-	FileIcon               string            `json:"file_icon"`
-	SizeHint               int               `json:"size_hint"`
-	Window                 *jsonWindow       `json:"window"`
-	Icon                   *jsonIcon         `json:"icon"`
+	Backend                string                      `json:"backend"`
+	IconPositions          map[string]dmg.IconPosition `json:"icon_positions"`
+	VolumeName             string                      `json:"volume_name"`
+	OutputPath             string                      `json:"output"`
+	Format                 string                      `json:"format"`
+	Filesystem             string                      `json:"filesystem"`
+	Files                  map[string]string           `json:"files"`
+	AddApplicationsSymlink *bool                       `json:"applications_symlink"`
+	Background             *jsonBackground             `json:"background"`
+	VolumeIcon             string                      `json:"volume_icon"`
+	FileIcon               string                      `json:"file_icon"`
+	SizeHint               int                         `json:"size_hint"`
+	Window                 *jsonWindow                 `json:"window"`
+	Icon                   *jsonIcon                   `json:"icon"`
 }
 
 type jsonBackground struct {
-	File  string     `json:"file"`
+	File  string      `json:"file"`
 	Color *[3]float64 `json:"color"`
 }
 
@@ -223,12 +249,18 @@ func loadConfig(path string) (dmg.Options, error) {
 	}
 
 	opts := dmg.Options{
-		VolumeName: cfg.VolumeName,
-		OutputPath: cfg.OutputPath,
-		Files:      cfg.Files,
-		VolumeIcon: cfg.VolumeIcon,
-		FileIcon:   cfg.FileIcon,
-		SizeHint:   cfg.SizeHint,
+		VolumeName:    cfg.VolumeName,
+		IconPositions: cfg.IconPositions,
+		OutputPath:    cfg.OutputPath,
+		Files:         cfg.Files,
+		VolumeIcon:    cfg.VolumeIcon,
+		FileIcon:      cfg.FileIcon,
+		SizeHint:      cfg.SizeHint,
+	}
+
+	opts.Backend, err = parseBackend(cfg.Backend)
+	if err != nil {
+		return dmg.Options{}, err
 	}
 
 	if cfg.Format != "" {
